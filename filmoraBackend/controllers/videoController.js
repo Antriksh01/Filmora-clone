@@ -10,6 +10,13 @@ const {
   applyVideoFilter,
   addBackgroundMusic,
 } = require("../processVideo");
+const shotstack = require("shotstack-sdk");
+
+const defaultClient = new shotstack.ApiClient();
+defaultClient.authentications["DeveloperKey"].apiKey =
+  "BkieDHwDa3BX1klRnnOrjMNzpEhJEcEYSI6ef0Fm";
+
+const editApi = new shotstack.EditApi(defaultClient);
 
 dotenv.config();
 
@@ -171,10 +178,52 @@ const addMusicInVideos = async (req, res) => {
   }
 };
 
+const shotstackRender = async (req, res) => {
+  try {
+    const { clips } = req.body;
+
+    const timeline = new shotstack.Timeline();
+    const track = new shotstack.Track();
+
+    clips.forEach((clip) => {
+      const asset =
+        clip.type.toLowerCase() === "video"
+          ? new shotstack.VideoAsset()
+          : new shotstack.TitleAsset();
+
+      asset.setSrc(clip.url || clip.content);
+      asset.setType(clip.type.toLowerCase());
+
+      const videoClip = new shotstack.Clip();
+      videoClip.setAsset(asset);
+      videoClip.setStart(0);
+      videoClip.setLength(5);
+
+      track.addClipsItem(videoClip);
+    });
+
+    timeline.setTracks([track]);
+
+    const output = new shotstack.Output();
+    output.setFormat("mp4");
+
+    const edit = new shotstack.Edit();
+    edit.setTimeline(timeline);
+    edit.setOutput(output);
+
+    const response = await editApi.postRender(edit);
+    res.json({ id: response.response.id });
+  } catch (error) {
+    console.error("Error rendering video:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   trimVideoProcess,
   mergeVideosProcess,
   addTextProcess,
   applyFilterProcess,
   addMusicInVideos,
+  shotstackRender,
 };
